@@ -1,0 +1,1971 @@
+<!-- Created by the MarvelousCooder -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Quickcoder2005/justiceSword@main/lib/css-loader.css"/>
+    <script src="https://cdn.jsdelivr.net/gh/Quickcoder2005/justiceSword@main/lib/phaser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/Quickcoder2005/justiceSword@main/lib/popify.min.js"></script>
+    <title> Godly Sword of Justice </title>
+<style>
+
+.html{
+    overflow-x: hidden;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+body{
+    overflow-x: hidden;
+    user-select: none;
+    margin: 0;
+    padding: 0;
+    background: #000;
+}
+progress::-webkit-progress-bar{
+    border: 0;
+    border-radius: 20px;
+    background: #eaeaea;
+}
+progress::-webkit-progress-value{
+    border: 0;
+    border-radius: 20px;
+    background: #f54290;
+}
+progress::-moz-progress-bar{
+    border: 0;
+    border-radius: 20px;
+    background: #f54290;
+}
+#menu{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background-color: silver;
+    border-radius: 7px;
+    box-shadow: 0.2em .35em gray;
+    -webkit-border-radius: 7px;
+}
+#button{
+    display: inline-block;
+    margin: 5px;
+    padding: 10px;
+    color: gray;
+    font-weight: bold;
+    text-shadow: -1px -1px black, 1px 1px white;
+    text-align: center;
+    outline: none;
+    border-radius: 7px;
+    box-shadow: 0.15em .2em gray;
+    background-color: lightgray;
+    -webkit-border-radius: 7px;
+    -moz-border-radius: 7px;
+    -o-border-radius: 7px;
+}
+
+</style>
+</head>
+<body oncontextmenu="return false">
+
+<div class="loader loader-bar is-active" data-text="Loading..."></div>
+<div id="game"></div>
+
+<script>
+
+const Game = Phaser.Class({
+    Extends: Phaser.Scene,
+
+    initialize: function(){
+        this.level = 1;
+        this.score = 0;
+        this.initScore = 0;
+        this.coins = 0;
+        this.initCoins = 0;
+        this.enemyHealth = 4;
+        this.playerHealth = 8;
+        this.difficulty = null;
+        this.notified = false;
+        this.initialized = false;
+
+        Phaser.Scene.call(this, {
+            key: "Game"
+        });
+    },
+    preload: function(){
+        this.load.setBaseURL("https://cdn.jsdelivr.net/gh/Quickcoder2005/justiceSword@main/assets");
+
+        this.load.image("background1", "backgrounds/background1.png");
+        this.load.image("background2", "backgrounds/background2.png");
+        this.load.image("background3", "backgrounds/background3.png");
+        this.load.image("tiles", "tiles/tiles.png");
+        this.load.image("objects", "tiles/objects.png");
+        this.load.image("extra", "tiles/extra.png");
+        this.load.image("orb", "images/orb.png");
+        this.load.image("coin", "images/coin.png");
+        this.load.image("key", "images/key.png");
+        this.load.image("health", "images/health.png");
+        this.load.image("swords", "images/swords.png");
+
+        this.load.spritesheet("player", "sprites/player.png", {
+            frameWidth: 126.3,
+            frameHeight: 128
+        });
+        this.load.spritesheet("enemy", "sprites/enemy.png", {
+            frameWidth: 48,
+            frameHeight: 48
+        });
+        this.load.spritesheet("boss", "sprites/boss.png", {
+            frameWidth: 50,
+            frameHeight: 50
+        });
+        this.load.spritesheet("prisoner", "sprites/prisoner.png", {
+            frameWidth: 48,
+            frameHeight: 48
+        });
+
+        this.load.tilemapTiledJSON("map1", "maps/level1.json");
+        this.load.tilemapTiledJSON("map2", "maps/level2.json");
+        this.load.tilemapTiledJSON("map3", "maps/level3.json");
+        this.load.tilemapTiledJSON("map4", "maps/level4.json");
+        this.load.tilemapTiledJSON("map5", "maps/level5.json");
+
+        this.load.audio("swordEffect", "sounds/sword.mp3");
+        this.load.audio("shoutEffect", "sounds/shout.mp3");
+        this.load.audio("coinEffect", "sounds/coins.mp3");
+        this.load.audio("barrelEffect", "sounds/barrel.mp3");
+        this.load.audio("menuMusic", "sounds/menu.mp3");
+        this.load.audio("backgroundMusic", "sounds/background.mp3");
+    },
+    create: function(){
+        this.initLevel();
+        this.createMap();
+        this.createControls();
+        this.createSounds();
+        this.orbGenerate();
+        this.enemyGenerate();
+        this.playerGenerate();
+        this.handleCamera();
+        this.handleCollisions();
+        this.createAnimations();
+        this.prisonerGenerate();
+        this.startGame();
+    },
+    createMap: function(){
+        this.map = this.make.tilemap({
+            key: this.mapKey
+        });
+
+        this.background = this.add.image(0, 0, this.backgroundImg);
+        this.background.setOrigin(0, 0);
+        this.background.displayWidth = this.map.widthInPixels*2;
+        this.background.displayHeight = this.map.heightInPixels*2;
+
+        this.levelLayer = this.map.addTilesetImage("Level", "tiles");
+        this.extraLayer = this.map.addTilesetImage("Extra", "extra");
+        this.objectLayer = this.map.addTilesetImage("Objects", "objects");
+
+        this.tileset = [this.levelLayer, this.extraLayer, this.objectLayer];
+
+        this.platforms = this.map.createLayer("Platforms", this.tileset, 0, 0);
+        this.platforms.setScale(2);
+        this.platforms.setDepth(0);
+
+        this.water = this.map.createLayer("Water", this.tileset, 0, 0);
+        this.water.setScale(2);
+        this.water.setDepth(2);
+
+        this.barrels = this.map.createLayer("Barrels", this.tileset, 0, 0);
+        this.barrels.setScale(2);
+        this.barrels.setDepth(0);
+
+        this.money = this.map.createLayer("Money", this.tileset, 0, 0);
+        this.money.setScale(2);
+        this.money.setDepth(0);
+
+        this.ladder = this.map.createLayer("Ladder", this.tileset, 0, 0);
+        this.ladder.setScale(2);
+        this.ladder.setDepth(0);
+
+        this.ladderTop = this.map.createLayer("LadderTop", this.tileset, 0, 0);
+        this.ladderTop.setScale(2);
+        this.ladderTop.setDepth(0);
+
+        this.key = this.map.createLayer("Key", this.tileset, 0, 0);
+        this.key.setScale(2);
+        this.key.setDepth(0);
+
+        this.keyHole = this.map.createLayer("KeyHole", this.tileset, 0, 0);
+        this.keyHole.setScale(2);
+        this.keyHole.setDepth(0);
+
+        if (this.level !== 5){
+            this.prison = this.map.createLayer("Prison", this.tileset, this.prisonConfig.prisonX, this.prisonConfig.prisonY);
+            this.prison.setScale(1.4);
+            this.prison.setDepth(0);
+        }
+        else{
+            this.prison = this.map.createLayer("Prison", this.tileset, 0, 0);
+            this.prison.setScale(2);
+            this.prison.setDepth(0);
+            this.prison.setVisible(false);
+            this.prison.setCollisionByExclusion([-1]);
+        }
+
+        this.traps = this.map.createLayer("Traps", this.tileset, 0, 0);
+        this.traps.setScale(2);
+        this.traps.setDepth(0);
+
+        this.decor = this.map.createLayer("Decor", this.tileset, 0, 0);
+        this.decor.setScale(2);
+        this.decor.setDepth(0);
+    },
+    createMenu: function(){
+        this.startMenu = document.createElement("div");
+        this.startMenu.setAttribute("id", "menu");
+
+        this.startButton = document.createElement("button");
+        this.startButton.setAttribute("id", "button");
+        this.startButton.setAttribute("style", "margin-left: 6.25px")
+        this.startButton.innerText = "Start Game";
+
+        this.startButton.onclick = () => {
+            this.initGame();
+        }
+
+        this.startMenu.appendChild(this.startButton);
+
+        this.lineBreak = document.createElement("br");
+
+        this.startMenu.appendChild(this.lineBreak);
+
+        this.instructionButton = document.createElement("button");
+        this.instructionButton.setAttribute("id", "button");
+        this.instructionButton.innerText = "Instructions";
+
+        this.instructionButton.onclick = () => {
+            this.popInstructions();
+        }
+
+        this.startMenu.appendChild(this.instructionButton);
+
+        this.startDom = this.add.dom(200, 300, this.startMenu);
+        this.startDom.setScrollFactor(0);
+
+        this.title = this.add.dom(200, 100, "h1", `
+            color: lightgrey;
+            text-shadow: -1.5px -1.5px white, 2px 2px black;
+        `, "Justice Sword");
+        this.title.setScrollFactor(0);
+        this.title.node.id = "title";
+
+        this.logo = this.add.image(200, 70, "swords");
+        this.logo.setScale(0.5);
+        this.logo.setScrollFactor(0);
+    },
+    createInfo: function(){
+        this.healthImg = this.add.image(10, 10, "health");
+        this.healthImg.setOrigin(0, 0);
+        this.healthImg.setScale(0.175);
+        this.healthImg.setDepth(2);
+        this.healthImg.setScrollFactor(0);
+
+        this.healthBar = this.add.dom(50, 11.5, "progress", `
+            -webkit-appearance: none;
+            appearance: none;
+              width: 120px;
+              height: 20px;
+              border: 2px solid #fff;
+              border-radius: 20px;
+              background: #eaeaea;
+        `);
+        this.healthBar.node.value = 1;
+        this.healthBar.setOrigin(0, 0);
+        this.healthBar.setDepth(2);
+        this.healthBar.setScrollFactor(0);
+
+        this.moneyImg = this.add.image(14, 40.75, "coin");
+        this.moneyImg.setOrigin(0, 0);
+        this.moneyImg.setScale(0.0175);
+        this.moneyImg.setDepth(2);
+        this.moneyImg.setScrollFactor(0);
+
+        this.moneyText = this.add.text(50, 45.75, `x ${this.coins}`, {
+            fontSize: "25px",
+            fill: "#fff"
+        });
+        this.moneyText.setScrollFactor(0);
+
+        this.orbImg = this.add.image(15, 75, "orb");
+        this.orbImg.setOrigin(0, 0);
+        this.orbImg.setScale(0.08);
+        this.orbImg.setDepth(2);
+        this.orbImg.setScrollFactor(0);
+
+        this.scoreText = this.add.text(50, 75, `x ${this.score}`, {
+            fontSize: "25px",
+            fill: "#fff"
+        });
+        this.scoreText.setDepth(2);
+        this.scoreText.setScrollFactor(0);     
+
+        this.keyImg = this.add.image(10, 92.5, "key");
+        this.keyImg.setOrigin(0, 0);
+        this.keyImg.setScale(0.2);
+        this.keyImg.setDepth(2);
+        this.keyImg.setVisible(false);
+        this.keyImg.setScrollFactor(0);
+
+        this.stage = this.add.text(240, 15, `Stage: ${this.level}/5`, {
+            fontSize: "25px",
+            fill: "#fff"
+        });
+        this.stage.setDepth(2);
+        this.stage.setScrollFactor(0);
+    },
+    createControls: function(){
+        this.desktop = this.sys.game.device.os.desktop;
+
+        this.cursors = this.input.keyboard.createCursorKeys();
+    },
+    createButtons: function(){
+        this.leftButton = this.add.dom(15, 485, "button", `
+            width: 80px;
+            height: 80px;
+            color: #000;
+            background: #fff;
+            border-radius: 50%;
+            outline: none;
+            user-select: none;
+        `, "LEFT");
+        this.leftButton.setAlpha(0.8);
+        this.leftButton.setDepth(2);
+        this.leftButton.setOrigin(0, 0);
+        this.leftButton.setScrollFactor(0);
+        this.leftButton.pressed = false;
+
+        this.leftButton.addListener("pointerdown");
+        this.leftButton.on("pointerdown", () => {
+            this.leftButton.pressed = true;
+        });
+
+        this.leftButton.addListener("pointerup");
+        this.leftButton.on("pointerup", () => {
+            this.leftButton.pressed = false;
+        });
+
+        this.leftButton.addListener("pointerout");
+        this.leftButton.setInteractive().on("pointerout", () => {
+            this.leftButton.pressed = false;
+        });
+
+        this.rightButton = this.add.dom(105, 485, "button", `
+            width: 80px;
+            height: 80px;
+            color: #000;
+            background: #fff;
+            border-radius: 50%;
+            outline: none;
+            user-select: none;
+        `, "RIGHT");
+        this.rightButton.setAlpha(0.8);
+        this.rightButton.setDepth(2);
+        this.rightButton.setOrigin(0, 0);
+        this.rightButton.setScrollFactor(0);
+        this.rightButton.pressed = false;
+
+        this.rightButton.addListener("pointerdown");
+        this.rightButton.on("pointerdown", () => {
+            this.rightButton.pressed = true;
+        });
+
+        this.rightButton.addListener("pointerup");
+        this.rightButton.on("pointerup", () => {
+            this.rightButton.pressed = false;
+        });
+
+        this.rightButton.addListener("pointerout");
+        this.rightButton.setInteractive().on("pointerout", () => {
+            this.rightButton.pressed = false;
+        });
+
+        this.jumpButton = this.add.dom(225, 490, "button", `
+            width: 80px;
+            height: 80px;
+            color: #fff;
+            background: #8634eb;
+            border-radius: 50%;
+            outline: none;
+            user-select: none;
+        `, "JUMP");
+        this.jumpButton.setAlpha(0.8);
+        this.jumpButton.setDepth(2);
+        this.jumpButton.setOrigin(0, 0);
+        this.jumpButton.setScrollFactor(0);
+        this.jumpButton.pressed = false;
+
+        this.jumpButton.addListener("pointerdown");
+        this.jumpButton.on("pointerdown", () => {
+            this.jumpButton.pressed = true;
+        });
+
+        this.jumpButton.addListener("pointerup");
+        this.jumpButton.on("pointerup", () => {
+            this.jumpButton.pressed = false;
+        });
+
+        this.jumpButton.addListener("pointerout");
+        this.jumpButton.setInteractive().on("pointerout", () => {
+            this.jumpButton.pressed = false;
+        });
+
+        this.attackButton = this.add.dom(305, 460, "button", `
+            width: 80px;
+            height: 80px;
+            color: #fff;
+            background: #eb34eb;
+            border-radius: 50%;
+            outline: none;
+            user-select: none;
+        `, "ATTACK");
+        this.attackButton.setAlpha(0.8);
+        this.attackButton.setDepth(2);
+        this.attackButton.setOrigin(0, 0);
+        this.attackButton.setScrollFactor(0);
+        this.attackButton.pressed = false;
+
+        this.attackButton.addListener("pointerdown");
+        this.attackButton.on("pointerdown", () => {
+            this.attackButton.pressed = true;
+        });
+
+        this.attackButton.addListener("pointerup");
+        this.attackButton.on("pointerup", () => {
+            this.attackButton.pressed = false;
+        });
+
+        this.attackButton.addListener("pointerout");
+        this.attackButton.setInteractive().on("pointerout", () => {
+            this.attackButton.pressed = false;
+        });
+
+    },
+    createSounds: function(){
+        this.swordEffect = this.sound.add("swordEffect");
+        this.shoutEffect = this.sound.add("shoutEffect");
+        this.coinEffect = this.sound.add("coinEffect");
+        this.barrelEffect = this.sound.add("barrelEffect");
+        this.menuMusic = this.sound.add("menuMusic", {
+            loop: true
+        });
+        this.backgroundMusic = this.sound.add("backgroundMusic", {
+            loop: true
+        });
+    },
+    createAnimations: function(){
+        this.anims.create({
+            key: "idle",
+            frames: this.anims.generateFrameNames("player", {
+                start: 0,
+                end: 9
+            }),
+            frameRate: 10,
+            repeat: -1
+        });
+        this.anims.create({
+            key: "run",
+            frames: this.anims.generateFrameNames("player", {
+                start: 10,
+                end: 17
+            }),
+            frameRate: 15,
+            repeat: -1
+        });
+        this.anims.create({
+            key: "jump",
+            frames: this.anims.generateFrameNames("player", {
+                start: 43,
+                end: 45
+            }),
+            frameRate: 7,
+            repeat: -1
+        });
+        this.anims.create({
+            key: "attack",
+            frames: this.anims.generateFrameNames("player", {
+                start: 26,
+                end: 32
+            }),
+            frameRate: 12,
+            repeat: 0
+        });
+        this.anims.create({
+            key: "hurt",
+            frames: [{
+                key: "player",
+                frame: 58
+            }],
+            frameRate: 9
+        });
+        this.anims.create({
+            key: "dead",
+            frames: this.anims.generateFrameNames("player", {
+                start: 46,
+                end: 56
+            }),
+            frameRate: 7,
+            repeat: 0
+        });
+        this.anims.create({
+            key: "enemyIdle",
+            frames: this.anims.generateFrameNames("enemy", {
+                start: 0,
+                end: 3
+            }),
+            frameRate: 5,
+            repeat: -1
+        });
+        this.anims.create({
+            key: "enemyAttack",
+            frames: this.anims.generateFrameNames("enemy", {
+                start: 7,
+                end: 11
+            }),
+            frameRate: 9,
+            repeat: 0
+        });
+        this.anims.create({
+            key: "enemyHurt",
+            frames: [{
+                key: "enemy",
+                frame: 12
+            }],
+            frameRate: 9
+        });
+        this.anims.create({
+            key: "enemyDead",
+            frames: this.anims.generateFrameNames("enemy", {
+                start: 13,
+                end: 20
+            }),
+            frameRate: 5,
+            repeat: 0
+        });
+        this.anims.create({
+            key: "bossIdle",
+            frames: this.anims.generateFrameNames("boss", {
+                start: 0,
+                end: 3
+            }),
+            frameRate: 5,
+            repeat: -1
+        });
+        this.anims.create({
+            key: "bossAttack",
+            frames: this.anims.generateFrameNames("boss", {
+                start: 7,
+                end: 11
+            }),
+            frameRate: 9,
+            repeat: 0
+        });
+        this.anims.create({
+            key: "bossHurt",
+            frames: [{
+                key: "boss",
+                frame: 12
+            }],
+            frameRate: 9
+        });
+        this.anims.create({
+            key: "bossDead",
+            frames: this.anims.generateFrameNames("boss", {
+                start: 13,
+                end: 20
+            }).reverse(),
+            frameRate: 5,
+            repeat: 0
+        });
+        this.anims.create({
+            key: "trapped",
+            frames: this.anims.generateFrameNames("prisoner", {
+                start: 0,
+                end: 3
+            }),
+            frameRate: 7,
+            repeat: -1
+        });
+        this.anims.create({
+            key: "trapped",
+            frames: this.anims.generateFrameNames("prisoner", {
+                start: 0,
+                end: 3
+            }),
+            frameRate: 7,
+            repeat: -1
+        });
+    },
+    orbGenerate(){
+        this.orbs = this.physics.add.group();
+    },
+    orbDestroy(){
+        Phaser.Actions.Call(this.orbs.getChildren(), (child) => {
+            if (!this.cameras.main.worldView.contains(child.x, child.y)){
+                child.destroy();
+            }
+            if (this.physics.overlap(child, this.player) && !this.player.dead){
+                if (!this.player.hurt){
+                    child.destroy();
+
+                    this.shoutEffect.play();
+
+                    this.player.health -= this.playerHealth;
+
+                    if (this.player.health <= 0){
+                        this.player.health = 0;
+                        this.player.dead = true;
+                        this.player.setVelocityX(0);
+                        this.player.setVelocityY(0);
+                        this.player.anims.stop();
+
+                        this.time.addEvent({
+                            delay: 500,
+                            loop: false,
+                            paused: false,
+                            callbackScope: this,
+                            callback: () => {
+                                this.player.anims.play("dead");
+                            }
+                        });
+
+                        this.time.addEvent({
+                            delay: 3000,
+                            loop: false,
+                            paused: false,
+                            callbackScope: this,
+                            callback: () => {
+                                this.restartLevel();
+                            }
+                        });
+                    }
+                    this.healthBar.node.value = this.player.health*0.01;                
+                }
+                this.player.hurt = true;
+                this.player.anims.play("hurt");
+
+                this.time.addEvent({
+                    delay: 500,
+                    loop: false,
+                    paused: false,
+                    callbackScope: this,
+                    callback: () => {
+                        this.player.hurt = false;
+                    }
+                });
+            }
+        });
+    },
+    barrelDestroy: function(){
+        this.barrels.forEachTile((barrel) => {
+            if (barrel.index !== -1){
+                if (this.player.attacking && !this.player.hurt && !this.player.dead && Phaser.Math.Distance.Between(this.player.x, this.player.y, barrel.pixelX*2 + barrel.width, barrel.pixelY*2) < 70){
+
+
+                    let emitter = this.add.particles("orb").createEmitter({
+                        x: barrel.pixelX*2 + barrel.width
+                        ,
+                        y: barrel.pixelY*2,
+                        speed: { 
+                            min: -555, 
+                            max: 555
+                        },
+                        angle: { 
+                            min: 0, 
+                            max: 360 
+                        },
+                        scale: { 
+                            start: 0.08, 
+                            end: 0.03
+                        },
+                        quantity: 6,
+                        lifespan: 800,
+                        gravityY: 100
+                    });
+                    emitter.explode();
+
+                    this.barrelEffect.play();
+
+                    this.barrels.removeTileAt(barrel.x, barrel.y);
+
+                    this.score += 3;
+                    this.scoreText.setText(`x ${this.score}`);
+
+                    this.player.health += 15;
+
+                    if (this.player.health >= 100){
+                        this.player.health = 100;
+                    }
+                    this.healthBar.node.value = this.player.health*0.01;                
+                }
+            }
+        });
+    },
+    moneyCollect: function(){
+        this.money.forEachTile((moneyBag) => {
+            if (moneyBag.index !== -1){
+                if (this.player.attacking && !this.player.hurt && Phaser.Math.Distance.Between(this.player.x, this.player.y, moneyBag.pixelX*2 + moneyBag.width, moneyBag.pixelY*2) < 70){
+
+                    let emitter = this.add.particles("coin").createEmitter({
+                        x: moneyBag.pixelX*2 + moneyBag.width
+                        ,
+                        y: moneyBag.pixelY*2,
+                        speed: { 
+                            min: -555, 
+                            max: 555
+                        },
+                        angle: { 
+                            min: 0,
+                            max: 360 
+                        },
+                        scale: { 
+                            start: 0.017, 
+                            end: 0.005
+                        },
+                        quantity: 6,
+                        lifespan: 800,
+                        gravityY: 100
+                    });
+                    emitter.explode();
+
+                    this.coinEffect.play();
+
+                    this.money.removeTileAt(moneyBag.x, moneyBag.y);
+
+                    this.coins += 3;
+                    this.moneyText.setText(`x ${this.coins}`);
+                }
+            }
+        });
+    },
+    playerGenerate: function(){
+        this.player = this.physics.add.sprite(this.playerConfig.x, this.playerConfig.y, "player");
+        this.player.flipX = this.playerConfig.flipX;
+        this.player.jumping = false;
+        this.player.attacking = false;
+        this.player.hurt = false;
+        this.player.dead = false;
+        this.player.hasKey = false;
+        this.player.health = 100;
+        this.player.setScale(1.3);
+        this.player.setDepth(1);
+        this.player.setSize(35, 35);
+        this.player.setGravityY(1100);
+        this.player.setCollideWorldBounds(true);
+
+        this.player.left = () => {
+            if (!this.player.dead){
+                this.player.flipX = true;
+
+                if (!this.player.jumping && !this.player.attacking){
+                    this.player.anims.play("run", true);
+                }
+                this.player.body.setVelocityX(-230);            
+            }
+        }
+        this.player.right = () => {
+            if (!this.player.dead){
+                this.player.flipX = false;
+
+                if (!this.player.jumping && !this.player.attacking){
+                    this.player.anims.play("run", true);
+                }
+                this.player.body.setVelocityX(230);        
+            }
+        }
+        this.player.jump = () => {
+            if (!this.player.dead){
+                if (!this.player.hurt){    
+                    this.player.body.setVelocityY(-530);
+                }
+            }
+        }
+        this.player.idle = () => {
+            if (!this.player.dead){
+                if (!this.player.jumping && !this.player.attacking && !this.player.hurt){
+                    this.player.anims.play("idle", true);
+                }
+                this.player.body.setVelocityX(0);            
+            }
+        }
+    },
+    prisonerGenerate: function(){
+        if (this.level !== 5){
+            this.prisoner = this.add.sprite(this.prisonConfig.prisonerX, this.prisonConfig.prisonerY, "prisoner");
+            this.prisoner.flipX = this.prisonConfig.prisonerFlipX;
+            this.prisoner.flipY = true;
+            this.prisoner.setScale(1.8);
+            this.prisoner.anims.play("trapped", true);
+
+            this.prisoner.message = this.add.text(this.prisonConfig.messageX, this.prisonConfig.messageY, "Help!", {
+                fontSize: "25px",
+                fontStyle: "bold",
+                fill: "#fff"
+            });
+            this.prisoner.message.blink = () => {
+                this.prisoner.messageTimer = this.time.addEvent({
+                    delay: 500,
+                    loop: true,
+                    paused: false,
+                    callbackScope: this,
+                    callback: () => {
+                        this.prisoner.message.setVisible(!this.prisoner.message.visible);
+                    }
+                });
+            }
+            this.prisoner.message.blink();
+        }
+    },
+    enemyGenerate: function(){
+        this.enemies = this.physics.add.group();
+
+        for (let i = 0; i < this.enemyXY.length; ++i){
+            enemy = this.enemies.create(this.enemyXY[i].x, this.enemyXY[i].y, "enemy");
+            enemy.setScale(1.7);
+            enemy.setSize(30, 43);
+            enemy.setGravityY(1100);
+            enemy.attacking = false;
+            enemy.attackable = false;
+            enemy.dead = false;
+            enemy.hurt = false;
+            enemy.health = this.enemyHealth;
+        }
+
+        if (this.level === 5){
+            this.enemyBoss();
+        }
+    },
+    enemyAttack: function(){
+        Phaser.Actions.Call(this.enemies.getChildren(), (child) => {
+            if (child.health > 0){
+                if (this.player.x > child.x){
+                    child.flipX = true;
+                }
+                else{
+                    child.flipX = false;
+                }
+            }
+            if (child.attackable && (child.health > 0) && !child.hurt && !this.player.dead){
+                child.anims.play("enemyAttack", true);
+            }
+            else if (!child.attackable && (child.health > 0) && !child.hurt){
+                child.anims.play("enemyIdle", true);
+            }
+            if ((Phaser.Math.Distance.Between(this.player.x, this.player.y, child.x, child.y) < 90)){
+                if (this.player.attacking && !child.dead && !child.hurt){
+                    child.health -= 1;
+
+                    if (child.health > 0){
+                        child.anims.play("enemyHurt", true);
+
+                        this.swordEffect.play();
+                    }
+                    else{
+                        child.dead = true;
+                        child.anims.play("enemyDead", true);
+
+                        this.score += 2;
+                        this.scoreText.setText(`x ${this.score}`);
+
+                        ++this.enemiesDefeated;
+                    }
+                    this.time.addEvent({
+                        delay: 1000,
+                        loop: false,
+                        paused: false,
+                        callbackScope: this,
+                        callback: () => {
+                            child.hurt = false;
+                        }
+                    });
+                    child.hurt = true;
+                }
+            }
+            if (Math.abs(Phaser.Math.Distance.Between(this.player.x, this.player.y, child.x, child.y)) < 150 && !child.attacking && !child.dead && !child.hurt && !this.player.dead){
+                let orb = this.orbs.create(child.x, child.y, "orb");
+                orb.setScale(0.08);
+
+                if (child.flipX){
+                    orb.setVelocityX(300);
+                }
+                else{
+                    orb.setVelocityX(-300);
+                }
+                child.attacking = true;
+                child.attackable = true;
+
+                this.time.addEvent({
+                    delay: 600,
+                    loop: false,
+                    paused: false,
+                    callbackScope: this,
+                    callback: () => {
+                        child.attacking = false;
+                        child.attackable = false;
+                    }
+                });
+            }
+        });
+
+        if (this.level === 5){
+            this.bossAttack();
+        }
+    },
+    enemyBoss: function(){
+        this.boss = this.physics.add.sprite(150, 300, "boss");
+        this.boss.setScale(2.25);
+        this.boss.setSize(30, 40);
+        this.boss.setGravityY(1100);
+        this.boss.attacking = false;
+        this.boss.attackable = false;
+        this.boss.dead = false;
+        this.boss.hurt = false;
+        this.boss.health = 20;
+        this.physics.add.collider(this.boss, this.platforms);
+    },
+    bossAttack: function(){
+        if (this.boss){
+            if (this.boss.health > 0){
+                if (this.player.x > this.boss.x){
+                    this.boss.flipX = true;
+                }
+                else{
+                    this.boss.flipX = false;
+                }
+            }
+            if (this.boss.attackable && (this.boss.health > 0) && !this.boss.hurt && !this.player.dead){
+                this.boss.anims.play("bossAttack", true);
+            }
+            else if (!this.boss.attackable && (this.boss.health > 0) && !this.boss.hurt){
+                this.boss.anims.play("bossIdle", true);
+            }
+            if ((Phaser.Math.Distance.Between(this.player.x, this.player.y, this.boss.x, this.boss.y) < 90)){
+                if (this.player.attacking && !this.boss.dead && !this.boss.hurt){
+                    this.boss.health -= 1;
+                    if (this.boss.health > 0){
+                        this.boss.anims.play("bossHurt", true);
+                    }
+                    else{
+                        this.boss.dead = true;
+                        this.boss.anims.play("bossDead", true);
+                        this.wayOpen();
+
+                        this.score += 20;
+                        this.scoreText.setText(`x ${this.score}`);
+                    }
+                    this.time.addEvent({
+                        delay: 1000,
+                        loop: false,
+                        paused: false,
+                        callbackScope: this,
+                        callback: () => {
+                            this.boss.hurt = false;
+                        }
+                    });
+                    this.boss.hurt = true;
+                }
+            }
+            if (Math.abs(Phaser.Math.Distance.Between(this.player.x, this.player.y, this.boss.x, this.boss.y)) < 150 && !this.boss.attacking && !this.boss.dead && !this.boss.hurt && !this.player.dead){
+                let orb = this.orbs.create(this.boss.x, this.boss.y, "orb");
+                orb.setScale(0.08);
+
+                if (this.boss.flipX){
+                    orb.setVelocityX(300);
+                }
+                else{
+                    orb.setVelocityX(-300);
+                }
+                this.boss.attacking = true;
+                this.boss.attackable = true;
+
+                this.time.addEvent({
+                    delay: 600,
+                    loop: false,
+                    paused: false,
+                    callbackScope: this,
+                    callback: () => {
+                        this.boss.attacking = false;
+                        this.boss.attackable = false;
+                    }
+                });
+            }
+        }
+    },
+    wayOpen: function(){
+        this.physics.add.collider(this.player, this.prison);
+        this.prison.setVisible(true);
+    },
+    handleCamera: function(){
+        this.cameras.main.setBounds(0, 0, 2*this.map.widthInPixels, 2*this.map.heightInPixels);
+    },
+    handleCollisions: function(){
+        this.platforms.setCollisionByExclusion([-1]);
+        this.physics.add.collider(this.player, this.platforms);
+        this.physics.add.collider(this.enemies, this.platforms);
+        this.physics.world.setBounds(0, 0, 2*this.map.widthInPixels, 2*this.map.heightInPixels);
+    },
+    handleTileCollisions: function(){
+        let waterTile = this.water.getTileAtWorldXY(this.player.x, this.player.y);
+
+        if (waterTile !== null){
+            this.restartLevel();
+
+            toastify({
+                text: "You fell into the water!",
+                toastBoxColor: "#fafafa",
+                toastBoxTextColor: "#000",
+                toastBoxShadow: "none",
+                toastBoxTextAlign: "center",
+                toastWidth: "90vw",
+                animationOut: "scale-up",
+                position: "top left",
+                toastCloseTimer: "2500"
+            });
+        }
+
+        let ladderTile = this.ladder.getTileAtWorldXY(this.player.x, this.player.y);
+
+        if (ladderTile !== null){
+            if (this.desktop){
+                if (this.cursors.up.isDown && !this.player.hurt && !this.player.dead){
+                    this.player.y -= 5;
+                    this.player.setVelocityY(0);
+                }
+            }
+            else{
+                if (this.jumpButton.pressed && !this.player.hurt && !this.player.dead){
+                    this.player.y -= 5;
+                    this.player.setVelocityY(0);
+                }                
+            }
+        }
+
+        let ladderTopTile = this.ladderTop.getTileAtWorldXY(this.player.x, this.player.y);
+
+        if (ladderTopTile !== null){
+            if (this.desktop){
+                if (this.cursors.up.isDown && !this.player.hurt && !this.player.dead){
+                    this.player.setVelocityY(-400);
+                }
+            }
+            else{
+                if (this.jumpButton.pressed && !this.player.hurt && !this.player.dead){
+                    this.player.setVelocityY(-400);
+                }                
+            }
+        }
+
+        let trapTile = this.traps.getTileAtWorldXY(this.player.x, this.player.y);
+
+        if (trapTile !== null){
+            this.restartLevel();
+
+            toastify({
+                text: "You touched the spikes!",
+                toastBoxColor: "#fafafa",
+                toastBoxTextColor: "#000",
+                toastBoxShadow: "none",
+                toastBoxTextAlign: "center",
+                toastWidth: "90vw",
+                animationOut: "scale-up",
+                position: "top left",
+                toastCloseTimer: "2500"
+            });
+        }
+
+        let keyTile = this.key.getTileAtWorldXY(this.player.x, this.player.y);
+
+        if (keyTile !== null){
+            this.key.removeTileAt(keyTile.x, keyTile.y);
+            this.keyImg.setVisible(true);
+            this.player.hasKey = true;
+        }
+
+        let keyHoleTile = this.keyHole.getTileAtWorldXY(this.player.x, this.player.y);
+
+        if (keyHoleTile !== null){
+            if (this.player.hasKey){
+                if ((this.enemiesDefeated === this.enemyXY.length)){
+                    switch (this.level){
+                        case 1:
+                            this.scene.pause();
+
+                            this.leftButton.pressed = false;
+                            this.rightButton.pressed = false;
+                            this.jumpButton.pressed = false;
+                            this.attackButton.pressed = false;
+
+                            this.player.left = () => {
+                                return null;
+                            }
+                            this.player.right = () => {
+                                return null;
+                            }
+                            this.player.jump = () => {
+                                return null;
+                            }
+                            this.player.attack = () => {
+                                return null;
+                            }
+
+                            this.scene.resume();
+
+                            this.player.setX(290);
+                            this.player.setY(500);
+                            this.player.flipX = true;
+
+                            this.prisoner.setX(220);
+                            this.prisoner.setY(501.25);
+                            this.prisoner.flipY = false;
+
+                            this.prisoner.message.setActive(false);
+                            this.prisoner.message.destroy();
+
+                            toastify({
+                                text: "Thank you for saving my life!",
+                                toastBoxColor: "#fafafa",
+                                toastBoxTextColor: "#000",
+                                toastBoxShadow: "none",
+                                toastBoxTextAlign: "center",
+                                toastWidth: "90vw",
+                                animationOut: "scale-up",
+                                position: "top left",
+                                toastCloseTimer: "2500"
+                            });
+
+                            this.time.addEvent({
+                                delay: 3500,
+                                loop: false, 
+                                paused: false,
+                                callbackScope: this,
+                                callback: () => {
+                                    this.nextLevel();
+                                }
+                            });
+
+                            break;
+                        case 2:
+                            this.scene.pause();
+
+                            this.leftButton.pressed = false;
+                            this.rightButton.pressed = false;
+                            this.jumpButton.pressed = false;
+                            this.attackButton.pressed = false;
+
+                            this.player.left = () => {
+                                return null;
+                            }
+                            this.player.right = () => {
+                                return null;
+                            }
+                            this.player.jump = () => {
+                                return null;
+                            }
+                            this.player.attack = () => {
+                                return null;
+                            }
+
+                            this.scene.resume();
+
+                            this.player.setX(1035);
+                            this.player.setY(600);
+                            this.player.flipX = true;
+
+                            this.prisoner.setX(975);
+                            this.prisoner.setY(600);
+                            this.prisoner.flipY = false;
+
+                            this.prisoner.message.setActive(false);
+                            this.prisoner.message.destroy();
+
+                            toastify({
+                                text: "Thank you for saving my life!",
+                                toastBoxColor: "#fafafa",
+                                toastBoxTextColor: "#000",
+                                toastBoxShadow: "none",
+                                toastBoxTextAlign: "center",
+                                toastWidth: "90vw",
+                                animationOut: "scale-up",
+                                position: "top left",
+                                toastCloseTimer: "2500"
+                            });
+
+                            this.time.addEvent({
+                                delay: 3500,
+                                loop: false, 
+                                paused: false,
+                                callbackScope: this,
+                                callback: () => {
+                                    this.nextLevel();
+                                }
+                            });
+
+                            break;
+                        case 3:
+                            this.scene.pause();
+
+                            this.leftButton.pressed = false;
+                            this.rightButton.pressed = false;
+                            this.jumpButton.pressed = false;
+                            this.attackButton.pressed = false;
+
+                            this.player.left = () => {
+                                return null;
+                            }
+                            this.player.right = () => {
+                                return null;
+                            }
+                            this.player.jump = () => {
+                                return null;
+                            }
+                            this.player.attack = () => {
+                                return null;
+                            }
+
+                            this.scene.resume();
+
+                            this.player.setX(2000);
+                            this.player.setY(350);
+                            this.player.flipX = false;
+
+                            this.prisoner.setX(2070);
+                            this.prisoner.setY(370);
+                            this.prisoner.flipY = false;
+
+                            this.prisoner.message.setActive(false);
+                            this.prisoner.message.destroy();
+
+                            toastify({
+                                text: "Thank you for saving my life!",
+                                toastBoxColor: "#fafafa",
+                                toastBoxTextColor: "#000",
+                                toastBoxShadow: "none",
+                                toastBoxTextAlign: "center",
+                                toastWidth: "90vw",
+                                animationOut: "scale-up",
+                                position: "top left",
+                                toastCloseTimer: "2500"
+                            });
+
+                            this.time.addEvent({
+                                delay: 3500,
+                                loop: false, 
+                                paused: false,
+                                callbackScope: this,
+                                callback: () => {
+                                    this.nextLevel();
+                                }
+                            });
+
+                            break;
+                        case 4:
+                            this.scene.pause();
+
+                            this.leftButton.pressed = false;
+                            this.rightButton.pressed = false;
+                            this.jumpButton.pressed = false;
+                            this.attackButton.pressed = false;
+
+                            this.player.left = () => {
+                                return null;
+                            }
+                            this.player.right = () => {
+                                return null;
+                            }
+                            this.player.jump = () => {
+                                return null;
+                            }
+                            this.player.attack = () => {
+                                return null;
+                            }
+
+                            this.scene.resume();
+
+                            this.player.setX(1975);
+                            this.player.setY(180);
+                            this.player.flipX = true;
+
+                            this.prisoner.setX(1905);
+                            this.prisoner.setY(180);
+                            this.prisoner.flipX = false;
+                            this.prisoner.flipY = false;
+
+                            this.prisoner.message.setActive(false);
+                            this.prisoner.message.destroy();
+
+                            toastify({
+                                text: "Thank you for saving my life!",
+                                toastBoxColor: "#fafafa",
+                                toastBoxTextColor: "#000",
+                                toastBoxShadow: "none",
+                                toastBoxTextAlign: "center",
+                                toastWidth: "90vw",
+                                animationOut: "scale-up",
+                                position: "top left",
+                                toastCloseTimer: "2500"
+                            });
+
+                            this.time.addEvent({
+                                delay: 3500,
+                                loop: false, 
+                                paused: false,
+                                callbackScope: this,
+                                callback: () => {
+                                    this.nextLevel();
+                                }
+                            });
+
+                            break;
+                        case 5:
+                            this.scene.pause();
+
+                            alertify({
+                                title: "You Won!",
+                                text: `You have successfully rescued all the people and defeated all the enemies! Rich started living happily with his family again ever since.\n\nYou collected ${this.coins} coins and ${this.score} orbs.\n\nYou finished the game in ${this.difficulty} mode.`,
+                                confirmButtonText: "Restart",
+                                confirmButtonColor: "silver",
+                                darkMode: true,
+                                onConfirmed: () => {
+                                    this.scene.restart({
+                                        level: this.level = 1,
+                                        score: this.score = 0,
+                                        coins: this.coins = 0,
+                                        initScore: this.initScore = 0,
+                                        initCoins: this.initCoins = 0,
+                                        notified: this.notified = false,
+                                        initialized: this.initialized = false,
+                                        stopMusic: this.backgroundMusic.stop()
+                                    });
+                                }
+                            });
+
+                            break;
+                    }
+                }
+                else{
+                    if (!this.onKeyHole && this.player.hasKey){
+                        toastify({
+                            text: "You must defeat all the enemies!",
+                            toastBoxColor: "#fafafa",
+                            toastBoxTextColor: "#000",
+                            toastBoxShadow: "none",
+                            toastBoxTextAlign: "center",
+                            toastWidth: "90vw",
+                            animationOut: "scale-up",
+                            position: "top left",
+                            toastCloseTimer: "2500"
+                        });
+                        this.onKeyHole = true;
+                    }
+                }
+            }
+            else{
+                if (!this.onKeyHole){
+                    toastify({
+                        text: "Find the key first!",
+                        toastBoxColor: "#fafafa",   
+                        toastBoxTextColor: "#000",
+                        toastBoxShadow: "none",
+                        toastBoxTextAlign: "center",
+                        toastWidth: "90vw",
+                        animationOut: "scale-up",
+                        position: "top left",
+                        toastCloseTimer: "2500"
+                    });
+                    this.onKeyHole = true;
+                }
+            }
+        }
+        else{
+            this.onKeyHole = false;
+        }
+    },
+    handleControls: function(){
+        if (this.started){
+            if (this.desktop){
+                if (this.cursors.left.isDown){
+                    if (!this.player.hurt){
+                        this.player.left();
+                    }
+                }
+                else if (this.cursors.right.isDown){
+                    if (!this.player.hurt){
+                        this.player.right();
+                    }
+                }
+                else{
+                    this.player.idle();
+                }
+                if (this.cursors.up.isDown && this.player.body.onFloor()){
+                    if (!this.player.hurt){
+                        this.player.jump();
+                    }
+                }
+                if (this.player.body.onFloor()){
+                    this.player.jumping = false;
+                }
+                else{
+                    this.player.jumping = true;
+                }
+                if (this.player.jumping){
+                    this.player.anims.play("jump", true);
+                }
+                if (this.cursors.shift.isDown && !this.player.jumping && !this.player.attacking && !this.player.hurt && !this.player.dead){
+                    this.player.attacking = true;
+                    this.player.anims.play("attack", true);
+
+                    this.time.addEvent({
+                        delay: 500,
+                        loop: false,
+                        paused: false,
+                        callbackScope: this,
+                        callback: () => {
+                            this.player.attacking = false;
+                        }
+                    });
+                }
+            }
+            else {
+                if (this.leftButton.pressed){
+                    if (!this.player.hurt){
+                        this.player.left();
+                    }
+                }
+                else if (this.rightButton.pressed){
+                    if (!this.player.hurt){
+                        this.player.right();
+                    }
+                }
+                else{
+                    this.player.idle();
+                }
+                if (this.jumpButton.pressed && this.player.body.onFloor()){
+                    if (!this.player.hurt){
+                        this.player.jump();
+                    }
+                }
+                if (this.player.body.onFloor()){
+                    this.player.jumping = false;
+                }
+                else{
+                    this.player.jumping = true;
+                }
+                if (this.player.jumping && !this.player.dead){
+                    this.player.anims.play("jump", true);
+                }
+                if (this.attackButton.pressed && !this.player.jumping && !this.player.attacking && !this.player.hurt && !this.player.dead){
+                    this.player.attacking = true;
+                    this.player.anims.play("attack", true);
+
+                    this.time.addEvent({
+                        delay: 500,
+                        loop: false,
+                        paused: false,
+                        callbackScope: this,
+                        callback: () => {
+                            this.player.attacking = false;
+                        }
+                    });
+                }
+            }
+        }
+    },
+    initLevel: function(){
+        switch (this.level){
+            case 1:
+                this.mapKey = "map1";
+                this.backgroundImg = "background1";
+
+                this.playerConfig = {
+                    x: 100,
+                    y: 100,
+                    flipX: false
+                };
+
+                this.prisonConfig = {
+                    prisonX: 0,
+                    prisonY: 125,
+                    prisonerX: 60,
+                    prisonerY: 530,
+                    prisonerFlipX: false,
+                    messageX: 70,
+                    messageY: 520
+                };
+
+                this.enemyXY = [
+                    {
+                        x: 600,
+                        y: 0
+                    },
+                    {
+                        x: 1030,
+                        y: 0
+                    },
+                    {
+                        x: 1550,
+                        y: 0
+                    },
+                    {
+                        x: 1990,
+                        y: 0
+                    },
+                    {
+                        x: 1700,
+                        y: 300
+                    },
+                    {
+                        x: 900,
+                        y: 450
+                    }
+                ];
+                this.enemiesDefeated = 0;
+                this.onKeyHole = false;
+
+                this.story = " Rich is a smart and strong person who used to live peacefully in a village until it was conquoered by some gang members. They have kept a lot of people hostage. He has fought a gang member and occupied his sword. Help Rich fight for justice and rescue his people!";
+
+                break;
+            case 2:
+                this.mapKey = "map2";
+                this.backgroundImg = "background2";
+
+                this.playerConfig = {
+                    x: 2200,
+                    y: 400,
+                    flipX: true
+                };
+
+                this.prisonConfig = {
+                    prisonX: 260,
+                    prisonY: 125,
+                    prisonerX: 858,
+                    prisonerY: 528,
+                    prisonerFlipX: false,
+                    messageX: 865,
+                    messageY: 520
+                };
+
+                this.enemyXY = [
+                    {
+                        x: 1900,
+                        y: 100
+                    },
+                    {
+                        x: 1475,
+                        y: 0
+                    },
+                    {
+                        x: 810,
+                        y: 0
+                    },
+                    {
+                        x: 320,
+                        y: 400
+                    },
+                    {
+                        x: 390,
+                        y: 0
+                    }
+                ];
+                this.enemiesDefeated = 0;
+                this.onKeyHole = false;
+
+                this.story = "Rich rescues a village member who leads him to the place where the gang members have imprisoned more people. What happens next?";
+
+                break;
+            case 3:
+                this.mapKey = "map3";
+                this.backgroundImg = "background3";
+
+                this.playerConfig = {
+                    x: 2150,
+                    y: 0,
+                    flipX: true
+                };
+
+                this.prisonConfig = {
+                    prisonX: 645,
+                    prisonY: 75,
+                    prisonerX: 2175,
+                    prisonerY: 365,
+                    prisonerFlipX: true,
+                    messageX: 2095,
+                    messageY: 360
+                };
+
+                this.enemyXY = [
+                    {
+                        x: 1700,
+                        y: 0
+                    },
+                    {
+                        x: 1370,
+                        y: 0
+                    },
+                    {
+                        x: 960,
+                        y: 0
+                    },
+                    {
+                        x: 700,
+                        y: 0
+                    },
+                    {
+                        x: 1900,
+                        y: 650
+                    },
+                    {
+                        x: 920,
+                        y: 300
+                    },
+                    {
+                        x: 670,
+                        y: 500 
+                    }
+                ];
+                this.enemiesDefeated = 0;
+                this.onKeyHole = false;
+
+                this.story = "Rich enters a place made with stone. He has defeated a lot of gang members so far but it looks like his journey has just begun. There's a long journey ahead...";
+
+                break;
+            case 4:
+                this.mapKey = "map4";
+                this.backgroundImg = "background2";
+
+                this.playerConfig = {
+                    x: 200,
+                    y: 500,
+                    flipX: false
+                };
+
+                this.prisonConfig = {
+                    prisonX: 600,
+                    prisonY: 20,
+                    prisonerX: 2108,
+                    prisonerY: 177,
+                    prisonerFlipX: true,
+                    messageX: 2060,
+                    messageY: 210
+                };
+
+                this.enemyXY = [
+                    {
+                        x: 625,
+                        y: 500
+                    },
+                    {
+                        x: 1000,
+                        y: 300
+                    },
+                    {
+                        x: 560,
+                        y: 300
+                    },
+                    {
+                        x: 140,
+                        y: 200
+                    },
+                    {
+                        x: 800,
+                        y: 100
+                    },
+                    {
+                        x: 1310,
+                        y: 0
+                    },
+                    {
+                        x: 1370,
+                        y: 300
+                    },
+                    {
+                        x: 1940,
+                        y: 400
+                    },
+                    {
+                        x: 1565,
+                        y: 500
+                    }
+                ];
+                this.enemiesDefeated = 0;
+                this.onKeyHole = false;
+
+                this.story = "Rich continues his journey to setting his village free. The journey gets rougher and rougher slowly as he makes progress. It would be interesting to see what happens next...";
+
+                break;
+            case 5:
+                this.mapKey = "map5";
+                this.backgroundImg = "background1";
+
+                this.playerConfig = {
+                    x: 1100,
+                    y: 0,
+                    flipX: true
+                };
+
+                this.enemyXY = [
+                    {
+                        x: 1210,
+                        y: 200
+                    },
+                    {
+                        x: 1140,
+                        y: 500
+                    },
+                    {
+                        x: 1710,
+                        y: 100
+                    },
+                    {
+                        x: 1600,
+                        y: 400
+                    },
+                    {
+                        x: 710,
+                        y: 100
+                    }
+                ];
+                this.enemiesDefeated = 0;
+                this.onKeyHole = false;
+
+                this.story = "It seems Rich's hard work has paid off as he has rescued most of the people. There are some gang members and their boss still remaining. Will he be able to win?";
+
+                break;
+        }
+    },
+    nextLevel: function(){
+        this.scene.restart({
+            level: ++this.level,
+            initScore: this.initScore = this.score,
+            initCoins: this.initCoins = this.coins,
+            notified: this.notified = false
+        });
+    },
+    restartLevel: function(){
+        this.scene.restart({
+            score: this.score = this.initScore,
+            coins: this.coins = this.initCoins
+        });
+    },
+    hideMenu: function(){
+        this.cameraman.setActive(false);
+        this.cameraman.destroy();
+
+        this.startDom.setActive(false);
+        this.startDom.setVisible(false);
+        this.startDom.destroy();
+
+        this.title.setActive(false);
+        this.title.setVisible(false);
+        this.title.destroy();
+
+        this.logo.setActive(false);
+        this.logo.setVisible(false);
+        this.logo.destroy();
+
+        this.time.removeEvent(this.montage);
+    },
+    notify: function(){
+        this.scene.pause();
+
+        alertify({
+            title: "Story",
+            text: this.story,
+            confirmButtonText: "Let's go!",
+            confirmButtonColor: "silver",
+            darkMode: true,
+            onConfirmed: () => {
+                this.scene.resume();
+            }
+        });
+        this.notified = true;
+    },
+    popInstructions: function(){
+        alertify({
+            title: "Instructions",
+            text: "Objectives:\n1) Your goal is to defeat the enemies, collect the key and rescue the imprisoned people.\n2) You can collect coins by smashing the money bags.\n3) You can revive your health by smashing the barrels. It's a vice decision to save barrels for later if you already have good health.\n4) You also collect orbs when you destroy barrels and defeat enemies.\n\nControls:\nPC -> Arrow keys to move, spacebar to jump and shift to attack.\nMobile -> On-screen buttons.",
+            confirmButtonText: "Understood",
+            confirmButtonColor: "silver",
+            darkMode: true
+        });
+    },
+    removeLoader: function(){
+        let loader = document.querySelector(".loader");
+
+        if (loader){
+            loader.remove();
+        }
+    },
+    startMontage: function(){
+        this.cameraman = this.add.image(100, 300, "");
+        this.cameraman.setVisible(false);
+        this.cameraman.speed = 2;
+
+        this.cameras.main.startFollow(this.cameraman);
+
+        this.montage = this.time.addEvent({
+            delay: 0,
+            loop: true,
+            paused: false,
+            callbackScope: this,
+            callback: () => {
+                this.cameraman.x += this.cameraman.speed;
+
+                if (this.cameraman.x >= 2100){
+                    this.cameraman.speed = -2;
+                }
+                if (this.cameraman.x <= 100){
+                    this.cameraman.speed = 2;
+                }
+            }
+        });
+    },
+    startGame: function(){
+        if (!this.initialized){
+            this.initialized = true;
+
+            this.started = false;
+            this.player.setVisible(false);
+
+            this.startMontage();
+            this.createMenu();
+            this.menuMusic.play();
+        }
+        else{
+            this.started = true;
+            this.cameras.main.startFollow(this.player);
+
+            this.createInfo();
+            this.createButtons();
+            this.createControls();
+
+            if (!this.notified){
+                this.notify();
+            }
+        }
+        this.removeLoader();
+    },
+    initGame: function(){
+        this.chooseDifficulty();
+    },
+    mainGame: function(){
+        this.hideMenu();
+
+        this.player.setX(this.playerConfig.x);
+        this.player.setY(this.playerConfig.y);
+        this.player.setVisible(true);
+
+        this.cameras.main.startFollow(this.player);
+
+        this.createInfo();
+        this.createButtons();
+        this.createControls();
+
+        if (!this.notified){
+            this.notify();
+        }
+        this.started = true;
+
+        this.menuMusic.stop();
+        this.backgroundMusic.play();
+    },
+    chooseDifficulty: function(){
+        alertify({
+            title: "Choose Difficulty",
+            confirmButtonText: "Easy",
+            cancelButtonText: "Medium",
+            denyButtonText: "Hard",
+            confirmButtonColor: "green",
+            cancelButtonColor: "blue",
+            denyButtonColor: "red",
+            cancelButton: true,
+            denyButton: true,
+            darkMode: true,
+            onConfirmed: () => {
+                this.difficulty = "EASY";
+
+                this.enemyHealth = 4;
+                this.playerHealth = 8;
+
+                Phaser.Actions.Call(this.enemies.getChildren(), (child) => {
+                    child.health = this.enemyHealth;
+                });
+                this.mainGame();
+            },
+            onCanceled: () => {
+                this.difficulty = "MEDIUM";
+
+                this.enemyHealth = 7;
+                this.playerHealth = 15;
+
+                Phaser.Actions.Call(this.enemies.getChildren(), (child) => {
+                    child.health = this.enemyHealth;
+                });
+                this.mainGame();
+            },
+            onDenied: () => {
+                this.difficulty = "HARD";
+
+                this.enemyHealth = 10;
+                this.playerHealth = 27;
+
+                Phaser.Actions.Call(this.enemies.getChildren(), (child) => {
+                    child.health = this.enemyHealth;
+                });
+                this.mainGame();
+            }
+        });
+    },
+    update: function(){
+        this.handleControls();
+        this.orbDestroy();
+        this.barrelDestroy();
+        this.moneyCollect();
+        this.enemyAttack();
+        this.handleTileCollisions();
+    }
+});
+
+new Phaser.Game({
+    type: Phaser.CANVAS,
+    width: 400,
+    height: 600,
+    parent: "game",
+    dom: {
+        createContainer: true
+    },
+    input: {
+        activePointers: 15
+    },
+    scene: [Game],
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    physics: {
+        default: "arcade",
+        arcade: {
+            debug: false
+        }
+    },
+    pixelArt: true,
+    roundPixels: false,
+    antiAlias: false,
+    banner: false
+});
+</script>
+</body>
+</html>
